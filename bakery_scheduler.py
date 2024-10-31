@@ -80,6 +80,12 @@ class ShiftAssignmentSchema(ma.SQLAlchemyAutoSchema):
         include_relationships = True
         load_instance = True
 
+    assignment_id = ma.auto_field()
+    # TODO work out why we need these ids for the jsonify to work correctly in the front end
+    shift_id = ma.auto_field()
+    user_id = ma.auto_field()
+    role_id = ma.auto_field()
+
 
 # Initialize Schemas
 user_schema = UserSchema()
