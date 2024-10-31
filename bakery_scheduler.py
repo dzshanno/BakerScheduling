@@ -1,12 +1,20 @@
 # Backend code for the Bakery Shift Scheduler web app using Flask
-
-from flask import Flask, request, jsonify
+import time
+from flask import Flask, request, jsonify, make_response
 from flask_sqlalchemy import SQLAlchemy
+from functools import wraps
+import jwt
+from datetime import timedelta
 from flask_bcrypt import Bcrypt
 from flask_marshmallow import Marshmallow
 from flask_cors import CORS
 import os
 from datetime import datetime
+from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.orm import joinedload
+
+# Secret key for JWT
+token_secret_key = os.getenv("TOKEN_SECRET_KEY", "supersecretkey")
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -24,6 +32,33 @@ ma = Marshmallow(app)
 class Role(db.Model):
     role_id = db.Column(db.Integer, primary_key=True)
     role_name = db.Column(db.String(50), unique=True, nullable=False)
+
+
+def create_base_roles():
+    base_roles = [
+        {"role_id": 1, "role_name": "Admin"},
+        {"role_id": 2, "role_name": "Trainer"},
+        {"role_id": 3, "role_name": "Trained Staff"},
+        {"role_id": 4, "role_name": "Trainee"},
+    ]
+
+    Session = scoped_session(sessionmaker(bind=db.engine))
+    session = Session()
+
+    with session.no_autoflush:
+        for role_data in base_roles:
+            existing_role = (
+                session.query(Role).filter_by(role_id=role_data["role_id"]).first()
+            )
+            if not existing_role:
+                new_role = Role(
+                    role_id=role_data["role_id"], role_name=role_data["role_name"]
+                )
+                session.add(new_role)
+                session.commit()
+
+    print("Base roles added successfully.")
+    session.close()
 
 
 # Define Users table
@@ -94,12 +129,50 @@ shifts_schema = ShiftSchema(many=True)
 shift_assignment_schema = ShiftAssignmentSchema()
 shift_assignments_schema = ShiftAssignmentSchema(many=True)
 
+
+# Utility function to verify token
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get("x-access-token")
+        if not token:
+            return jsonify({"message": "Token is missing!"}), 403
+        try:
+            data = jwt.decode(token, token_secret_key, algorithms=["HS256"])
+            current_user = (
+                User.query.options(joinedload(User.role))
+                .filter_by(user_id=data["user_id"])
+                .first()
+            )
+        except:
+            return jsonify({"message": "Token is invalid!"}), 403
+        return f(current_user, *args, **kwargs)
+
+    return decorated
+
+
 # API Endpoints
+
+
+# Protected route to get all users
+@app.route("/users", methods=["GET"])
+@token_required
+def get_users(current_user):
+    if current_user.role.role_name != "Admin":
+        return (
+            jsonify({"message": "Unauthorized. Only admins can view all users."}),
+            403,
+        )
+    all_users = User.query.all()
+    return users_schema.jsonify(all_users)
 
 
 # Delete a user
 @app.route("/users/<int:user_id>", methods=["DELETE"])
-def delete_user(user_id):
+@token_required
+def delete_user(current_user, user_id):
+    if current_user.role.role_name != "Admin":
+        return jsonify({"message": "Unauthorized. Only admins can delete users."}), 403
     user = User.query.get(user_id)
     if user is None:
         return jsonify({"message": "User not found"}), 404
@@ -139,9 +212,58 @@ def delete_shift_assignment(assignment_id):
         return jsonify({"message": str(e)}), 400
 
 
-# Create a new user
+# User login
+def authenticate_user(username, password):
+    user = User.query.filter_by(username=username).first()
+    if user and bcrypt.check_password_hash(user.password_hash, password):
+        return user
+    return None
+
+
+@app.route("/login", methods=["POST"])
+def login():
+    # Extract username and password from the JSON body instead of request.authorization
+    data = request.get_json()
+    if not data or not data.get("username") or not data.get("password"):
+        return make_response(
+            "Could not verify",
+            401,
+            {"WWW-Authenticate": 'Basic realm="Login required!"'},
+        )
+
+    username = data["username"]
+    password = data["password"]
+
+    user = authenticate_user(username, password)
+    if not user:
+        return make_response(
+            "Could not verify",
+            401,
+            {"WWW-Authenticate": 'Basic realm="Login required!"'},
+        )
+
+    token = jwt.encode(
+        {
+            "user_id": user.user_id,
+            "username": user.username,  # Add this line to include the username in the token
+            "exp": datetime.utcnow() + timedelta(hours=1),
+        },
+        token_secret_key,
+        algorithm="HS256",
+    )
+    return jsonify({"token": token})
+
+
+# Create a new user with admin verification
 @app.route("/users", methods=["POST"])
-def add_user():
+@token_required
+def add_user(current_user):
+    if current_user.role.role_name != "Admin":
+        return (
+            jsonify({"message": "Unauthorized. Only admins can create new users."}),
+            403,
+        )
+
     username = request.json["username"]
     email = request.json["email"]
     password = request.json["password"]
@@ -161,16 +283,25 @@ def add_user():
         return jsonify({"message": str(e)}), 400
 
 
-# Get all users
-@app.route("/users", methods=["GET"])
-def get_users():
-    all_users = User.query.all()
-    return users_schema.jsonify(all_users)
+# Get all shifts
+@app.route("/shifts", methods=["GET"])
+def get_shifts():
+    all_shifts = Shift.query.all()
+    return shifts_schema.jsonify(all_shifts)
 
 
 # Create a new shift
 @app.route("/shifts", methods=["POST"])
-def add_shift():
+@token_required
+def add_shift(current_user):
+    if current_user.role.role_name not in ["Admin", "Manager"]:
+        return (
+            jsonify(
+                {"message": "Unauthorized. Only admins and managers can create shifts."}
+            ),
+            403,
+        )
+
     shift_date_str = request.json["shift_date"]
     start_time_str = request.json["start_time"]
     end_time_str = request.json["end_time"]
@@ -210,13 +341,6 @@ def add_shift():
         return jsonify({"message": str(e)}), 400
 
 
-# Get all shifts
-@app.route("/shifts", methods=["GET"])
-def get_shifts():
-    all_shifts = Shift.query.all()
-    return shifts_schema.jsonify(all_shifts)
-
-
 # Assign user to a shift
 @app.route("/shift_assignments", methods=["POST"])
 def assign_shift():
@@ -246,5 +370,6 @@ if __name__ == "__main__":
     if not os.path.exists("bakery_scheduler.db"):
         with app.app_context():
             db.create_all()
+            # TODO add base roles
             print("Database created successfully!")
     app.run(debug=True)

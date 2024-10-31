@@ -17,3 +17,4 @@ packaging==24.1
 SQLAlchemy==2.0.36
 typing_extensions==4.12.2
 Werkzeug==3.0.6
+PyJWT==2.3.0

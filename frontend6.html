@@ -9,8 +9,19 @@
 </head>
 
 <body>
+    <header class="bg-light p-3 mb-4">
+        <div class="container d-flex justify-content-between align-items-center">
+            <h4>Bakery Shift Scheduler</h4>
+            <div id="userStatus">
+                <span id="loggedInUser" class="me-3"></span>
+                <button id="logoutButton" class="btn btn-danger btn-sm d-none">Logout</button>
+            </div>
+        </div>
+    </header>
+
     <div class="container mt-5">
         <h1 class="mb-4">Bakery Shift Scheduler</h1>
+
         <!-- Login Form -->
         <div class="card mb-4">
             <div class="card-body">
@@ -25,12 +36,9 @@
                         <input type="password" class="form-control" id="loginPassword" required>
                     </div>
                     <button type="submit" class="btn btn-primary">Login</button>
-                    <button id="logoutButton" class="btn btn-secondary mb-3">Logout</button>
                 </form>
             </div>
         </div>
-
-
 
         <!-- User Creation Form -->
         <div class="card mb-4">
@@ -92,28 +100,6 @@
             </div>
         </div>
 
-        <!-- Shift Assignment Form -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Assign User to Shift</h5>
-                <form id="assignmentForm">
-                    <div class="mb-3">
-                        <label for="shiftId" class="form-label">Shift ID</label>
-                        <input type="number" class="form-control" id="shiftId" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="userId" class="form-label">User ID</label>
-                        <input type="number" class="form-control" id="userId" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="assignmentRoleId" class="form-label">Role ID</label>
-                        <input type="number" class="form-control" id="assignmentRoleId" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Assign User to Shift</button>
-                </form>
-            </div>
-        </div>
-
         <!-- List of Users -->
         <div class="card mb-4">
             <div class="card-body">
@@ -135,6 +121,29 @@
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
+        // Update the header to show login status
+        function updateUserStatus() {
+            const token = localStorage.getItem('jwtToken');
+            if (token) {
+                const decoded = parseJwt(token);
+                $('#loggedInUser').text(`Logged in as: ${decoded.username}`);
+                $('#logoutButton').removeClass('d-none');
+            } else {
+                $('#loggedInUser').text('Not logged in');
+                $('#logoutButton').addClass('d-none');
+            }
+        }
+
+        // Parse JWT to get user information
+        function parseJwt(token) {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+
+            return JSON.parse(jsonPayload);
+        }
 
         // Handle login form submission
         $('#loginForm').submit(function (event) {
@@ -154,27 +163,19 @@
                     localStorage.setItem('jwtToken', response.token);
                     alert('Login successful!');
                     $('#loginForm')[0].reset();
+                    updateUserStatus();
                 },
                 error: function (xhr, status, error) {
                     alert('Login failed: ' + xhr.responseText);
                 }
             });
         });
+
         // Handle logout button click
         $('#logoutButton').click(function () {
-            localStorage.removeItem('jwtToken'); // Remove the token
+            localStorage.removeItem('jwtToken');
             alert('Logged out successfully!');
-            // Optionally redirect to login form or reset the UI
-            window.location.href = '#login';
-        });
-
-        // Example for handling token expiry or invalid tokens
-        $(document).ajaxError(function (event, jqxhr, settings, thrownError) {
-            if (jqxhr.status === 403) {
-                alert('Session expired or unauthorized. Please log in again.');
-                // Optionally redirect to the login form
-                window.location.href = '#login'; // Example redirect
-            }
+            updateUserStatus();
         });
 
         // Utility function to add the JWT token to requests
@@ -185,6 +186,7 @@
             }
             return {};
         }
+
         // Submit user creation form
         $('#userForm').submit(function (event) {
             event.preventDefault();
@@ -228,33 +230,10 @@
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify(shiftData),
+                headers: getAuthHeader(), // Add the JWT token here
                 success: function (response) {
                     alert('Shift created successfully!');
                     $('#shiftForm')[0].reset();
-                },
-                error: function (xhr, status, error) {
-                    alert('Error: ' + xhr.responseJSON.message);
-                }
-            });
-        });
-
-        // Submit shift assignment form
-        $('#assignmentForm').submit(function (event) {
-            event.preventDefault();
-            const assignmentData = {
-                shift_id: parseInt($('#shiftId').val()),
-                user_id: parseInt($('#userId').val()),
-                role_id: parseInt($('#assignmentRoleId').val())
-            };
-
-            $.ajax({
-                url: 'http://127.0.0.1:5000/shift_assignments',
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify(assignmentData),
-                success: function (response) {
-                    alert('User assigned to shift successfully!');
-                    $('#assignmentForm')[0].reset();
                 },
                 error: function (xhr, status, error) {
                     alert('Error: ' + xhr.responseJSON.message);
@@ -271,7 +250,7 @@
                 success: function (response) {
                     $('#userList').empty();
                     response.forEach(function (user) {
-                        $('#userList').append('<li class="list-group-item">ID: ' + user.user_id + ', Username: ' + user.username + ', Email: ' + user.email + ', Role ID: ' + user.role_id + ' <button class="btn btn-danger btn-sm float-end delete-user" data-id="' + user.user_id + '">Delete</button></li>');
+                        $('#userList').append('<li class="list-group-item">ID: ' + user.user_id + ', Username: ' + user.username + ', Email: ' + user.email + ', Role ID: ' + user.role_id + '</li>');
                     });
                 },
                 error: function (xhr, status, error) {
@@ -280,17 +259,16 @@
             });
         });
 
-        // Load list of shifts with assignments
+        // Load list of shifts
         $('#loadShifts').click(function () {
             $.ajax({
                 url: 'http://127.0.0.1:5000/shifts',
                 type: 'GET',
+                headers: getAuthHeader(), // Add the JWT token here
                 success: function (response) {
                     $('#shiftList').empty();
                     response.forEach(function (shift) {
-                        const shiftElement = $('<li class="list-group-item">ID: ' + shift.shift_id + ', Date: ' + shift.shift_date + ', Start: ' + shift.start_time + ', End: ' + shift.end_time + ', Trainees Needed: ' + shift.num_trainee_needed + ', Trained Needed: ' + shift.num_trained_needed + ', Trainers Needed: ' + shift.num_trainer_needed + ' <button class="btn btn-danger btn-sm float-end delete-shift" data-id="' + shift.shift_id + '">Delete</button></li>');
-                        $('#shiftList').append(shiftElement);
-                        loadAssignmentsUnderShift(shift.shift_id, shiftElement);
+                        $('#shiftList').append('<li class="list-group-item">ID: ' + shift.shift_id + ', Date: ' + shift.shift_date + ', Start: ' + shift.start_time + ', End: ' + shift.end_time + ', Trainees Needed: ' + shift.num_trainee_needed + ', Trained Needed: ' + shift.num_trained_needed + ', Trainers Needed: ' + shift.num_trainer_needed + '</li>');
                     });
                 },
                 error: function (xhr, status, error) {
@@ -299,90 +277,9 @@
             });
         });
 
-        // Load assignments under each shift
-        function loadAssignmentsUnderShift(shiftId, shiftElement) {
-            $.ajax({
-                url: 'http://127.0.0.1:5000/shift_assignments',
-                type: 'GET',
-                success: function (response) {
-                    const assignments = response.filter(assignment => assignment.shift_id === shiftId);
-                    if (assignments.length > 0) {
-                        let assignmentsList = '<ul class="list-group mt-2">';
-                        assignments.forEach(function (assignment) {
-                            assignmentsList += '<li class="list-group-item">Assignment ID: ' + assignment.assignment_id + ', User ID: ' + assignment.user_id + ', Role ID: ' + assignment.role_id + ' <button class="btn btn-danger btn-sm float-end delete-assignment" data-id="' + assignment.assignment_id + '">Delete</button></li>';
-                        });
-                        assignmentsList += '</ul>';
-                        shiftElement.append(assignmentsList);
-                    }
-                },
-                error: function (xhr, status, error) {
-                    alert('Error: ' + xhr.responseJSON.message);
-                }
-            });
-        }
-
-        // Delete assignment
-        $(document).on('click', '.delete-assignment', function () {
-            const assignmentId = $(this).data('id');
-            $.ajax({
-                url: 'http://127.0.0.1:5000/shift_assignments/' + assignmentId,
-                type: 'DELETE',
-                success: function (response) {
-                    alert('Assignment deleted successfully!');
-                    $('#loadShifts').click(); // Reload shifts and assignments
-                },
-                error: function (xhr, status, error) {
-                    alert('Error: ' + xhr.responseJSON.message);
-                }
-            });
-        });
-
-        // Delete user
-        $(document).on('click', '.delete-user', function () {
-            const userId = $(this).data('id');
-            $.ajax({
-                url: 'http://127.0.0.1:5000/users/' + userId,
-                type: 'DELETE',
-                success: function (response) {
-                    alert('User deleted successfully!');
-                    $('#loadUsers').click();
-                },
-                error: function (xhr, status, error) {
-                    alert('Error: ' + xhr.responseJSON.message);
-                }
-            });
-        });
-
-        // Delete shift
-        $(document).on('click', '.delete-shift', function () {
-            const shiftId = $(this).data('id');
-            $.ajax({
-                url: 'http://127.0.0.1:5000/shifts/' + shiftId,
-                type: 'DELETE',
-                success: function (response) {
-                    alert('Shift deleted successfully!');
-                    $('#loadShifts').click();
-                },
-                error: function (xhr, status, error) {
-                    alert('Error: ' + xhr.responseJSON.message);
-                }
-            });
-        });
-
-        // Delete shift assignment
-        $(document).on('click', '.delete-assignment', function () {
-            const assignmentId = $(this).data('id');
-            $.ajax({
-                url: 'http://127.0.0.1:5000/shift_assignments/' + assignmentId,
-                type: 'DELETE',
-                success: function (response) {
-                    alert('Assignment deleted successfully!');
-                    $('#loadAssignments').click();
-                },
-                error: function (xhr, status, error) {
-                    alert('Error: ' + xhr.responseJSON.message);
-                }
-            });
+        // Update user status on page load
+        $(document).ready(function () {
+            updateUserStatus();
         });
     </script>
 </body>
