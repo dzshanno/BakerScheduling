@@ -1,0 +1,78 @@
+Features for the Bakers' Scheduling Web App
+User Authentication:
+
+Login System: Allow bakers to create accounts and log in securely.
+Role Management: Assign roles (e.g., trainee, trained, trainer) to help the business manager view schedules at different experience levels.
+Shift Scheduling:
+
+Calendar Interface: Display available shifts (e.g., Wednesday-Saturday) so bakers can sign up for slots.
+Role Requirements: Indicate how many trainees, trainers, or trained people are needed for each shift.
+Shift Requests: Allow bakers to request to work specific shifts, which can then be approved by the business manager.
+Business Manager Dashboard:
+
+View Shift Status: The business manager can see who has signed up for each shift and whether the team is fully staffed.
+Add/Edit Shifts: Ability to add extra shifts, edit existing ones, or fill gaps as needed.
+Notifications: Notify bakers about unfilled shifts or shift changes, ensuring enough staff coverage.
+Notification System:
+
+Automatic Alerts: Email or SMS notifications to bakers when shifts are added, confirmed, or changed.
+Reminders: Automated reminders for upcoming shifts.
+Technical Implementation
+Tools and Frameworks to Use:
+Backend:
+
+Python with Flask or Django: These frameworks are both well-suited for managing authentication, backend logic, and integration with a database.
+Database: Use SQLite (for small scale) or PostgreSQL/MySQL for scalability. This will store user data, shifts, and roles.
+Frontend:
+
+HTML, CSS, JavaScript: For a responsive and easy-to-use interface.
+React or Vue.js (optional): To add more interactive elements, making the scheduling interface more user-friendly.
+Hosting:
+
+Heroku or Render: Good options for hosting your app with minimal hassle.
+Firebase: Can also be considered for hosting if you want an easy integration with other Google services.
+Authentication:
+
+Flask-Login or Django Auth: To manage user authentication.
+OAuth: Integration with Google or other OAuth providers for simplified user sign-up and sign-in.
+Basic Architecture
+Home Page:
+
+Overview of upcoming shifts, and a button to log in or sign up.
+User Dashboard:
+
+View Shifts: Users can see available shifts and the status of their signed-up shifts.
+Sign Up for Shifts: Select specific shifts to sign up for based on availability.
+Admin Dashboard (Business Manager):
+
+Shift Overview: A calendar-style view of shifts, indicating how many bakers are signed up and what roles are covered.
+Add/Edit Shifts: A form to add new shifts or edit current ones.
+Approve/Reject Shifts: Manage which bakers are assigned to shifts.
+
+
+Step-by-Step Implementation Plan
+Design the Database:
+
+Users Table: Stores user data (username, password, role).
+Shifts Table: Stores information about each shift (date, time, number of slots available).
+Shift Signups Table: Stores relationships between users and shifts (who signed up for what).
+Build the Backend:
+
+Set up models for users, shifts, and shift signups.
+Implement authentication (using Django’s built-in or Flask-Login).
+Create the Frontend:
+
+Develop forms for signing up/logging in.
+Use a calendar interface for viewing shifts (a JavaScript library like FullCalendar can be helpful).
+Implement a responsive design to ensure it works well on both desktop and mobile.
+Integrate Backend and Frontend:
+
+Use API endpoints to link the backend logic with the frontend display, allowing users to sign up for shifts and receive real-time updates.
+Testing:
+
+Ensure that users can only sign up for available shifts and that the right number of trainees, trained bakers, and trainers are assigned to each.
+Test the business manager dashboard to ensure easy visibility of unfilled shifts.
+Deployment:
+
+Host the web app on a platform like Heroku or Render.
+Set up domain and security (e.g., HTTPS) for safe usage by all the bakers.
