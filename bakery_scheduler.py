@@ -62,16 +62,22 @@ class ShiftAssignment(db.Model):
 class UserSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = User
+        include_relationships = True
+        load_instance = True
 
 
 class ShiftSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Shift
+        include_relationships = True
+        load_instance = True
 
 
 class ShiftAssignmentSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = ShiftAssignment
+        include_relationships = True
+        load_instance = True
 
 
 # Initialize Schemas
@@ -88,92 +94,99 @@ shift_assignments_schema = ShiftAssignmentSchema(many=True)
 # Create a new user
 @app.route("/users", methods=["POST"])
 def add_user():
-    username = request.json["username"]
-    email = request.json["email"]
-    password = request.json["password"]
-    role_id = request.json["role_id"]
+    with app.app_context():
+        username = request.json["username"]
+        email = request.json["email"]
+        password = request.json["password"]
+        role_id = request.json["role_id"]
 
-    # Hash the password
-    password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
-    new_user = User(
-        username=username, email=email, password_hash=password_hash, role_id=role_id
-    )
+        # Hash the password
+        password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
+        new_user = User(
+            username=username, email=email, password_hash=password_hash, role_id=role_id
+        )
 
-    try:
-        db.session.add(new_user)
-        db.session.commit()
-        return user_schema.jsonify(new_user), 201
-    except Exception as e:
-        return jsonify({"message": str(e)}), 400
+        try:
+            db.session.add(new_user)
+            db.session.commit()
+            return user_schema.jsonify(new_user), 201
+        except Exception as e:
+            return jsonify({"message": str(e)}), 400
 
 
 # Get all users
 @app.route("/users", methods=["GET"])
 def get_users():
-    all_users = User.query.all()
-    return users_schema.jsonify(all_users)
+    with app.app_context():
+        all_users = User.query.all()
+        return users_schema.jsonify(all_users)
 
 
 # Create a new shift
 @app.route("/shifts", methods=["POST"])
 def add_shift():
-    shift_date = request.json["shift_date"]
-    start_time = request.json["start_time"]
-    end_time = request.json["end_time"]
-    num_trainee_needed = request.json.get("num_trainee_needed", 0)
-    num_trained_needed = request.json.get("num_trained_needed", 0)
-    num_trainer_needed = request.json.get("num_trainer_needed", 0)
+    with app.app_context():
+        shift_date = request.json["shift_date"]
+        start_time = request.json["start_time"]
+        end_time = request.json["end_time"]
+        num_trainee_needed = request.json.get("num_trainee_needed", 0)
+        num_trained_needed = request.json.get("num_trained_needed", 0)
+        num_trainer_needed = request.json.get("num_trainer_needed", 0)
 
-    new_shift = Shift(
-        shift_date=shift_date,
-        start_time=start_time,
-        end_time=end_time,
-        num_trainee_needed=num_trainee_needed,
-        num_trained_needed=num_trained_needed,
-        num_trainer_needed=num_trainer_needed,
-    )
+        new_shift = Shift(
+            shift_date=shift_date,
+            start_time=start_time,
+            end_time=end_time,
+            num_trainee_needed=num_trainee_needed,
+            num_trained_needed=num_trained_needed,
+            num_trainer_needed=num_trainer_needed,
+        )
 
-    try:
-        db.session.add(new_shift)
-        db.session.commit()
-        return shift_schema.jsonify(new_shift), 201
-    except Exception as e:
-        return jsonify({"message": str(e)}), 400
+        try:
+            db.session.add(new_shift)
+            db.session.commit()
+            return shift_schema.jsonify(new_shift), 201
+        except Exception as e:
+            return jsonify({"message": str(e)}), 400
 
 
 # Get all shifts
 @app.route("/shifts", methods=["GET"])
 def get_shifts():
-    all_shifts = Shift.query.all()
-    return shifts_schema.jsonify(all_shifts)
+    with app.app_context():
+        all_shifts = Shift.query.all()
+        return shifts_schema.jsonify(all_shifts)
 
 
 # Assign user to a shift
 @app.route("/shift_assignments", methods=["POST"])
 def assign_shift():
-    shift_id = request.json["shift_id"]
-    user_id = request.json["user_id"]
-    role_id = request.json["role_id"]
+    with app.app_context():
+        shift_id = request.json["shift_id"]
+        user_id = request.json["user_id"]
+        role_id = request.json["role_id"]
 
-    new_assignment = ShiftAssignment(
-        shift_id=shift_id, user_id=user_id, role_id=role_id
-    )
-    try:
-        db.session.add(new_assignment)
-        db.session.commit()
-        return shift_assignment_schema.jsonify(new_assignment), 201
-    except Exception as e:
-        return jsonify({"message": str(e)}), 400
+        new_assignment = ShiftAssignment(
+            shift_id=shift_id, user_id=user_id, role_id=role_id
+        )
+        try:
+            db.session.add(new_assignment)
+            db.session.commit()
+            return shift_assignment_schema.jsonify(new_assignment), 201
+        except Exception as e:
+            return jsonify({"message": str(e)}), 400
 
 
 # Get all shift assignments
 @app.route("/shift_assignments", methods=["GET"])
 def get_shift_assignments():
-    all_assignments = ShiftAssignment.query.all()
-    return shift_assignments_schema.jsonify(all_assignments)
+    with app.app_context():
+        all_assignments = ShiftAssignment.query.all()
+        return shift_assignments_schema.jsonify(all_assignments)
 
 
 if __name__ == "__main__":
-    if not os.path.exists("bakery_scheduler.db"):
-        db.create_all()
+    with app.app_context():
+        if not os.path.exists("bakery_scheduler.db"):
+            db.create_all()
     app.run(debug=True)
