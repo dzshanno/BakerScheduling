@@ -5,7 +5,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_marshmallow import Marshmallow
 from flask_cors import CORS
-import os
+from db_setup_script import setup_database, Role, User, Shift, ShiftAssignment
+from datetime import datetime
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -14,48 +15,8 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///bakery_scheduler.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Initialize extensions
-db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 ma = Marshmallow(app)
-
-
-# Define Roles table
-class Role(db.Model):
-    role_id = db.Column(db.Integer, primary_key=True)
-    role_name = db.Column(db.String(50), unique=True, nullable=False)
-
-
-# Define Users table
-class User(db.Model):
-    user_id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    email = db.Column(db.String(100), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
-    role_id = db.Column(db.Integer, db.ForeignKey("role.role_id"))
-    role = db.relationship("Role", backref=db.backref("users", lazy=True))
-    date_joined = db.Column(db.DateTime, default=db.func.current_timestamp())
-
-
-# Define Shifts table
-class Shift(db.Model):
-    shift_id = db.Column(db.Integer, primary_key=True)
-    shift_date = db.Column(db.Date, nullable=False)
-    start_time = db.Column(db.Time, nullable=False)
-    end_time = db.Column(db.Time, nullable=False)
-    num_trainee_needed = db.Column(db.Integer, default=0)
-    num_trained_needed = db.Column(db.Integer, default=0)
-    num_trainer_needed = db.Column(db.Integer, default=0)
-
-
-# Define ShiftAssignments table
-class ShiftAssignment(db.Model):
-    assignment_id = db.Column(db.Integer, primary_key=True)
-    shift_id = db.Column(db.Integer, db.ForeignKey("shift.shift_id"))
-    user_id = db.Column(db.Integer, db.ForeignKey("user.user_id"))
-    role_id = db.Column(db.Integer, db.ForeignKey("role.role_id"))
-    shift = db.relationship("Shift", backref=db.backref("assignments", lazy=True))
-    user = db.relationship("User", backref=db.backref("assignments", lazy=True))
-    role = db.relationship("Role")
 
 
 # Marshmallow Schemas for serialization
@@ -126,12 +87,27 @@ def get_users():
 @app.route("/shifts", methods=["POST"])
 def add_shift():
     with app.app_context():
-        shift_date = request.json["shift_date"]
-        start_time = request.json["start_time"]
-        end_time = request.json["end_time"]
+        shift_date_str = request.json["shift_date"]
+        start_time_str = request.json["start_time"]
+        end_time_str = request.json["end_time"]
         num_trainee_needed = request.json.get("num_trainee_needed", 0)
         num_trained_needed = request.json.get("num_trained_needed", 0)
         num_trainer_needed = request.json.get("num_trainer_needed", 0)
+
+        # Convert date and time strings to Python datetime objects
+        try:
+            shift_date = datetime.strptime(shift_date_str, "%Y-%m-%d").date()
+            start_time = datetime.strptime(start_time_str, "%H:%M:%S").time()
+            end_time = datetime.strptime(end_time_str, "%H:%M:%S").time()
+        except ValueError as e:
+            return (
+                jsonify(
+                    {
+                        "message": "Invalid date or time format. Use YYYY-MM-DD for dates and HH:MM:SS for times."
+                    }
+                ),
+                400,
+            )
 
         new_shift = Shift(
             shift_date=shift_date,
@@ -186,7 +162,5 @@ def get_shift_assignments():
 
 
 if __name__ == "__main__":
-    with app.app_context():
-        if not os.path.exists("bakery_scheduler.db"):
-            db.create_all()
+    setup_database(app)
     app.run(debug=True)
