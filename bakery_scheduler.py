@@ -81,7 +81,6 @@ class ShiftAssignmentSchema(ma.SQLAlchemyAutoSchema):
         load_instance = True
 
     assignment_id = ma.auto_field()
-    # TODO work out why we need these ids for the jsonify to work correctly in the front end
     shift_id = ma.auto_field()
     user_id = ma.auto_field()
     role_id = ma.auto_field()
@@ -96,6 +95,48 @@ shift_assignment_schema = ShiftAssignmentSchema()
 shift_assignments_schema = ShiftAssignmentSchema(many=True)
 
 # API Endpoints
+
+
+# Delete a user
+@app.route("/users/<int:user_id>", methods=["DELETE"])
+def delete_user(user_id):
+    user = User.query.get(user_id)
+    if user is None:
+        return jsonify({"message": "User not found"}), 404
+    try:
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({"message": "User deleted successfully"}), 200
+    except Exception as e:
+        return jsonify({"message": str(e)}), 400
+
+
+# Delete a shift
+@app.route("/shifts/<int:shift_id>", methods=["DELETE"])
+def delete_shift(shift_id):
+    shift = Shift.query.get(shift_id)
+    if shift is None:
+        return jsonify({"message": "Shift not found"}), 404
+    try:
+        db.session.delete(shift)
+        db.session.commit()
+        return jsonify({"message": "Shift deleted successfully"}), 200
+    except Exception as e:
+        return jsonify({"message": str(e)}), 400
+
+
+# Delete a shift assignment
+@app.route("/shift_assignments/<int:assignment_id>", methods=["DELETE"])
+def delete_shift_assignment(assignment_id):
+    assignment = ShiftAssignment.query.get(assignment_id)
+    if assignment is None:
+        return jsonify({"message": "Assignment not found"}), 404
+    try:
+        db.session.delete(assignment)
+        db.session.commit()
+        return jsonify({"message": "Assignment deleted successfully"}), 200
+    except Exception as e:
+        return jsonify({"message": str(e)}), 400
 
 
 # Create a new user
