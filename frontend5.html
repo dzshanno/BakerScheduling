@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bakery Shift Scheduler</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+</head>
+
+<body>
+    <div class="container mt-5">
+        <h1 class="mb-4">Bakery Shift Scheduler</h1>
+
+        <!-- User Creation Form -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Create New User</h5>
+                <form id="userForm">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="role" class="form-label">Role ID</label>
+                        <input type="number" class="form-control" id="role" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create User</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Shift Creation Form -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Create New Shift</h5>
+                <form id="shiftForm">
+                    <div class="mb-3">
+                        <label for="shiftDate" class="form-label">Shift Date</label>
+                        <input type="date" class="form-control" id="shiftDate" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="startTime" class="form-label">Start Time</label>
+                        <input type="time" class="form-control" id="startTime" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="endTime" class="form-label">End Time</label>
+                        <input type="time" class="form-control" id="endTime" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="numTrainee" class="form-label">Number of Trainees Needed</label>
+                        <input type="number" class="form-control" id="numTrainee" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="numTrained" class="form-label">Number of Trained Staff Needed</label>
+                        <input type="number" class="form-control" id="numTrained" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="numTrainer" class="form-label">Number of Trainers Needed</label>
+                        <input type="number" class="form-control" id="numTrainer" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Shift</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Shift Assignment Form -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Assign User to Shift</h5>
+                <form id="assignmentForm">
+                    <div class="mb-3">
+                        <label for="shiftId" class="form-label">Shift ID</label>
+                        <input type="number" class="form-control" id="shiftId" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="userId" class="form-label">User ID</label>
+                        <input type="number" class="form-control" id="userId" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="assignmentRoleId" class="form-label">Role ID</label>
+                        <input type="number" class="form-control" id="assignmentRoleId" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Assign User to Shift</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- List of Users -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">List of Users</h5>
+                <button id="loadUsers" class="btn btn-secondary mb-3">Load Users</button>
+                <ul id="userList" class="list-group"></ul>
+            </div>
+        </div>
+
+        <!-- List of Shifts -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">List of Shifts</h5>
+                <button id="loadShifts" class="btn btn-secondary mb-3">Load Shifts</button>
+                <ul id="shiftList" class="list-group"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        // Submit user creation form
+        $('#userForm').submit(function (event) {
+            event.preventDefault();
+            const userData = {
+                username: $('#username').val(),
+                email: $('#email').val(),
+                password: $('#password').val(),
+                role_id: parseInt($('#role').val())
+            };
+
+            $.ajax({
+                url: 'http://127.0.0.1:5000/users',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(userData),
+                success: function (response) {
+                    alert('User created successfully!');
+                    $('#userForm')[0].reset();
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
+        // Submit shift creation form
+        $('#shiftForm').submit(function (event) {
+            event.preventDefault();
+            const shiftData = {
+                shift_date: $('#shiftDate').val(),
+                start_time: $('#startTime').val() + ':00',
+                end_time: $('#endTime').val() + ':00',
+                num_trainee_needed: parseInt($('#numTrainee').val()),
+                num_trained_needed: parseInt($('#numTrained').val()),
+                num_trainer_needed: parseInt($('#numTrainer').val())
+            };
+
+            $.ajax({
+                url: 'http://127.0.0.1:5000/shifts',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(shiftData),
+                success: function (response) {
+                    alert('Shift created successfully!');
+                    $('#shiftForm')[0].reset();
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
+        // Submit shift assignment form
+        $('#assignmentForm').submit(function (event) {
+            event.preventDefault();
+            const assignmentData = {
+                shift_id: parseInt($('#shiftId').val()),
+                user_id: parseInt($('#userId').val()),
+                role_id: parseInt($('#assignmentRoleId').val())
+            };
+
+            $.ajax({
+                url: 'http://127.0.0.1:5000/shift_assignments',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(assignmentData),
+                success: function (response) {
+                    alert('User assigned to shift successfully!');
+                    $('#assignmentForm')[0].reset();
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
+        // Load list of users
+        $('#loadUsers').click(function () {
+            $.ajax({
+                url: 'http://127.0.0.1:5000/users',
+                type: 'GET',
+                success: function (response) {
+                    $('#userList').empty();
+                    response.forEach(function (user) {
+                        $('#userList').append('<li class="list-group-item">ID: ' + user.user_id + ', Username: ' + user.username + ', Email: ' + user.email + ', Role ID: ' + user.role_id + ' <button class="btn btn-danger btn-sm float-end delete-user" data-id="' + user.user_id + '">Delete</button></li>');
+                    });
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
+        // Load list of shifts with assignments
+        $('#loadShifts').click(function () {
+            $.ajax({
+                url: 'http://127.0.0.1:5000/shifts',
+                type: 'GET',
+                success: function (response) {
+                    $('#shiftList').empty();
+                    response.forEach(function (shift) {
+                        const shiftElement = $('<li class="list-group-item">ID: ' + shift.shift_id + ', Date: ' + shift.shift_date + ', Start: ' + shift.start_time + ', End: ' + shift.end_time + ', Trainees Needed: ' + shift.num_trainee_needed + ', Trained Needed: ' + shift.num_trained_needed + ', Trainers Needed: ' + shift.num_trainer_needed + ' <button class="btn btn-danger btn-sm float-end delete-shift" data-id="' + shift.shift_id + '">Delete</button></li>');
+                        $('#shiftList').append(shiftElement);
+                        loadAssignmentsUnderShift(shift.shift_id, shiftElement);
+                    });
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
+        // Load assignments under each shift
+        function loadAssignmentsUnderShift(shiftId, shiftElement) {
+            $.ajax({
+                url: 'http://127.0.0.1:5000/shift_assignments',
+                type: 'GET',
+                success: function (response) {
+                    const assignments = response.filter(assignment => assignment.shift_id === shiftId);
+                    if (assignments.length > 0) {
+                        let assignmentsList = '<ul class="list-group mt-2">';
+                        assignments.forEach(function (assignment) {
+                            assignmentsList += '<li class="list-group-item">Assignment ID: ' + assignment.assignment_id + ', User ID: ' + assignment.user_id + ', Role ID: ' + assignment.role_id + ' <button class="btn btn-danger btn-sm float-end delete-assignment" data-id="' + assignment.assignment_id + '">Delete</button></li>';
+                        });
+                        assignmentsList += '</ul>';
+                        shiftElement.append(assignmentsList);
+                    }
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        }
+
+        // Delete assignment
+        $(document).on('click', '.delete-assignment', function () {
+            const assignmentId = $(this).data('id');
+            $.ajax({
+                url: 'http://127.0.0.1:5000/shift_assignments/' + assignmentId,
+                type: 'DELETE',
+                success: function (response) {
+                    alert('Assignment deleted successfully!');
+                    $('#loadShifts').click(); // Reload shifts and assignments
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
+        // Delete user
+        $(document).on('click', '.delete-user', function () {
+            const userId = $(this).data('id');
+            $.ajax({
+                url: 'http://127.0.0.1:5000/users/' + userId,
+                type: 'DELETE',
+                success: function (response) {
+                    alert('User deleted successfully!');
+                    $('#loadUsers').click();
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
+        // Delete shift
+        $(document).on('click', '.delete-shift', function () {
+            const shiftId = $(this).data('id');
+            $.ajax({
+                url: 'http://127.0.0.1:5000/shifts/' + shiftId,
+                type: 'DELETE',
+                success: function (response) {
+                    alert('Shift deleted successfully!');
+                    $('#loadShifts').click();
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
+        // Delete shift assignment
+        $(document).on('click', '.delete-assignment', function () {
+            const assignmentId = $(this).data('id');
+            $.ajax({
+                url: 'http://127.0.0.1:5000/shift_assignments/' + assignmentId,
+                type: 'DELETE',
+                success: function (response) {
+                    alert('Assignment deleted successfully!');
+                    $('#loadAssignments').click();
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>
