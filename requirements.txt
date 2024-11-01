@@ -21,5 +21,6 @@ PyJWT==2.3.0
 psycopg2-binary
 python-dotenv
 flask-migrate
-flask-socketsio
+flask-socketio
 eventlet
+gunicorn

@@ -1,6 +1,6 @@
 # Backend code for the Bakery Shift Scheduler web app using Flask
 import time
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, render_template
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
 import jwt
@@ -153,6 +153,11 @@ def token_required(f):
 
 
 # API Endpoints
+
+
+@app.route("/")
+def home():
+    return render_template("index.html")
 
 
 # Protected route to get all users
