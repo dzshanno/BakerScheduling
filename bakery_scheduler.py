@@ -12,6 +12,9 @@ import os
 from datetime import datetime
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm import joinedload
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Secret key for JWT
 token_secret_key = os.getenv("TOKEN_SECRET_KEY", "supersecretkey")
@@ -19,9 +22,7 @@ token_secret_key = os.getenv("TOKEN_SECRET_KEY", "supersecretkey")
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)
-app.config["SQLALCHEMY_DATABASE_URI"] = (
-    "postgresql://username:password@localhost:5432/bakery_scheduler_db"
-)
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Initialize extensions

@@ -1,1 +1,22 @@
+
+# Ignore Python compiled files
+__pycache__/
+*.py[cod]
+
+# Environment settings and secrets
 .env
+config.py
+
+# Ignore SQLite database files
+*.sqlite3
+bakery_scheduler.db
+
+# Ignore virtual environment folder
+venv/
+
+# Ignore any local or personal configuration files
+*.local
+.DS_Store
+
+# Logs
+*.log
