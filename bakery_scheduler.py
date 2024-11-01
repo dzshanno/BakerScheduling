@@ -14,6 +14,9 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm import joinedload
 from dotenv import load_dotenv
 from flask_migrate import Migrate
+from flask_socketio import SocketIO
+from flask_socketio import emit
+import eventlet
 
 load_dotenv()
 
@@ -30,6 +33,7 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 ma = Marshmallow(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 migrate = Migrate(app, db)
 
@@ -296,6 +300,8 @@ def add_user(current_user):
     try:
         db.session.add(new_user)
         db.session.commit()
+        print("emitting new user")
+        socketio.emit("new_user", user_schema.dump(new_user))
         return user_schema.jsonify(new_user), 201
     except Exception as e:
         return jsonify({"message": str(e)}), 400
@@ -354,6 +360,9 @@ def add_shift(current_user):
     try:
         db.session.add(new_shift)
         db.session.commit()
+        # Emit the new shift data to all connected clients
+        print("emitting new shift")
+        socketio.emit("new_shift", shift_schema.dump(new_shift))
         return shift_schema.jsonify(new_shift), 201
     except Exception as e:
         return jsonify({"message": str(e)}), 400
@@ -383,6 +392,13 @@ def assign_shift(current_user):
     role_id = request.json["role_id"]
     status = request.json.get("status", "Available")  # Default status to 'Available'
 
+    # Check if the user is already assigned to the same shift
+    existing_assignment = ShiftAssignment.query.filter_by(
+        shift_id=shift_id, user_id=user_id
+    ).first()
+    if existing_assignment:
+        return jsonify({"message": "User is already assigned to this shift."}), 400
+
     new_assignment = ShiftAssignment(
         shift_id=shift_id, user_id=user_id, role_id=role_id, status=status
     )
@@ -395,37 +411,29 @@ def assign_shift(current_user):
         return jsonify({"message": str(e)}), 400
 
 
-# update assignment status
-@app.route("/shift_assignments/<int:assignment_id>/status", methods=["PATCH"])
+@app.route("/shift_assignments/<int:assignment_id>", methods=["PATCH"])
 @token_required
-def update_assignment_status(current_user, assignment_id):
+def update_shift_assignment_status(current_user, assignment_id):
     if current_user.role.role_name not in ["Admin", "Manager"]:
         return (
             jsonify(
                 {
-                    "message": "Unauthorized. Only admins or managers can update shift status."
+                    "message": "Unauthorized. Only admins or managers can update assignments."
                 }
             ),
             403,
         )
 
     assignment = ShiftAssignment.query.get(assignment_id)
-    if not assignment:
+    if assignment is None:
         return jsonify({"message": "Assignment not found"}), 404
 
-    new_status = request.json.get("status")
-    if new_status not in [
-        "Available",
-        "Assigned",
-        "Confirmed",
-        "Cancelled",
-        "No-show",
-        "Completed",
-    ]:
-        return jsonify({"message": "Invalid status value."}), 400
+    status = request.json.get("status")
+    if not status:
+        return jsonify({"message": "Status is required"}), 400
 
     try:
-        assignment.status = new_status
+        assignment.status = status
         db.session.commit()
         return shift_assignment_schema.jsonify(assignment), 200
     except Exception as e:
@@ -438,7 +446,7 @@ if __name__ == "__main__":
             db.create_all()
             # TODO add base roles
             print("Database created successfully!")
-    app.run(debug=True)
+    socketio.run(app, debug=True, host="0.0.0.0", port=5000)
 
 
 @app.route("/shifts/<int:shift_id>/assignments", methods=["GET"])

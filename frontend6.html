@@ -59,7 +59,13 @@
                     </div>
                     <div class="mb-3">
                         <label for="role" class="form-label">Role</label>
-                        <select class="form-select" id="role" required></select>
+                        <select class="form-select" id="role" required>
+                            <option value="" disabled selected>Select Role</option>
+                            <option value="1">Admin</option>
+                            <option value="2">Trainer</option>
+                            <option value="3">Trained Staff</option>
+                            <option value="4">Trainee</option>
+                        </select>
                     </div>
                     <button type="submit" class="btn btn-primary">Create User</button>
                 </form>
@@ -127,7 +133,6 @@
         <div class="card mb-4">
             <div class="card-body">
                 <h5 class="card-title">List of Users</h5>
-                <button id="loadUsers" class="btn btn-secondary mb-3">Load Users</button>
                 <ul id="userList" class="list-group"></ul>
             </div>
         </div>
@@ -136,7 +141,6 @@
         <div class="card mb-4">
             <div class="card-body">
                 <h5 class="card-title">List of Shifts</h5>
-                <button id="loadShifts" class="btn btn-secondary mb-3">Load Shifts</button>
                 <ul id="shiftList" class="list-group"></ul>
             </div>
         </div>
@@ -144,6 +148,7 @@
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
+
         // Update the header to show login status with role info
         function updateUserStatus() {
             const token = localStorage.getItem('jwtToken');
@@ -152,11 +157,6 @@
                 $('#loggedInUser').text(`Logged in as: ${decoded.username}`);
                 $('#logoutButton').removeClass('d-none');
 
-                if (decoded.role_name === 'Admin') {
-                    $('#userForm').show();  // Show the user creation form only if admin
-                } else {
-                    $('#userForm').hide();
-                }
             } else {
                 $('#loggedInUser').text('Not logged in');
                 $('#logoutButton').addClass('d-none');
@@ -305,6 +305,7 @@
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify(assignmentData),
+                headers: getAuthHeader(), // Add the JWT token here
                 success: function (response) {
                     alert('User assigned to shift successfully!');
                     $('#assignmentForm')[0].reset();
@@ -315,66 +316,8 @@
             });
         });
 
-        // Load list of users
-        $('#loadUsers').click(function () {
-            $.ajax({
-                url: 'http://127.0.0.1:5000/users',
-                type: 'GET',
-                headers: getAuthHeader(), // Add the JWT token here
-                success: function (response) {
-                    $('#userList').empty();
-                    response.forEach(function (user) {
-                        // Display role information correctly
-                        const roleName = user.role ? user.role.role_name : 'No role assigned';
-                        $('#userList').append('<li class="list-group-item">ID: ' + user.user_id + ', Username: ' + user.username + ', Email: ' + user.email + ', Role: ' + roleName + '</li>');
-                    });
-                },
-                error: function (xhr, status, error) {
-                    alert('Error: ' + xhr.responseJSON.message);
-                }
-            });
-        });
 
-        // Load list of shifts with assignments
-        $('#loadShifts').click(function () {
-            $.ajax({
-                url: 'http://127.0.0.1:5000/shifts',
-                type: 'GET',
-                success: function (response) {
-                    $('#shiftList').empty();
-                    response.forEach(function (shift) {
-                        const shiftElement = $('<li class="list-group-item">ID: ' + shift.shift_id + ', Date: ' + shift.shift_date + ', Start: ' + shift.start_time + ', End: ' + shift.end_time + ', Trainees Needed: ' + shift.num_trainee_needed + ', Trained Needed: ' + shift.num_trained_needed + ', Trainers Needed: ' + shift.num_trainer_needed + ' <button class="btn btn-danger btn-sm float-end delete-shift" data-id="' + shift.shift_id + '">Delete</button></li>');
-                        $('#shiftList').append(shiftElement);
-                        loadAssignmentsUnderShift(shift.shift_id, shiftElement);
-                    });
-                },
-                error: function (xhr, status, error) {
-                    alert('Error: ' + xhr.responseJSON.message);
-                }
-            });
-        });
 
-        // Load assignments under each shift
-        function loadAssignmentsUnderShift(shiftId, shiftElement) {
-            $.ajax({
-                url: 'http://127.0.0.1:5000/shift_assignments',
-                type: 'GET',
-                success: function (response) {
-                    const assignments = response.filter(assignment => assignment.shift_id === shiftId);
-                    if (assignments.length > 0) {
-                        let assignmentsList = '<ul class="list-group mt-2">';
-                        assignments.forEach(function (assignment) {
-                            assignmentsList += '<li class="list-group-item">Baker: ' + assignment.user.username + ', Role: ' + assignment.role.role_name + ' <button class="btn btn-danger btn-sm float-end delete-assignment" data-id="' + assignment.assignment_id + '">Delete</button></li>';
-                        });
-                        assignmentsList += '</ul>';
-                        shiftElement.append(assignmentsList);
-                    }
-                },
-                error: function (xhr, status, error) {
-                    alert('Error: ' + xhr.responseJSON.message);
-                }
-            });
-        }
 
         // Delete assignment
         $(document).on('click', '.delete-assignment', function () {
@@ -443,6 +386,136 @@
         // Update user status on page load
         $(document).ready(function () {
             updateUserStatus();
+        });
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        $(document).ready(function () {
+            const socket = io.connect('http://127.0.0.1:5000');
+
+            // Automatically load users when the page loads
+            loadUsers();
+            loadShifts();
+
+            // Load list of users
+            function loadUsers() {
+                $.ajax({
+                    url: 'http://127.0.0.1:5000/users',
+                    type: 'GET',
+                    headers: getAuthHeader(), // Add the JWT token here
+                    success: function (response) {
+                        $('#userList').empty();
+                        response.forEach(function (user) {
+                            $('#userList').append('<li class="list-group-item">ID: ' + user.user_id + ', Username: ' + user.username + ', Email: ' + user.email + ', Role: ' + user.role.role_name + '</li>');
+                        });
+                    },
+                    error: function (xhr, status, error) {
+                        alert('Error: ' + xhr.responseJSON.message);
+                    }
+                });
+            }
+
+            // Load list of shifts
+            function loadShifts() {
+                $.ajax({
+                    url: 'http://127.0.0.1:5000/shifts',
+                    type: 'GET',
+                    headers: getAuthHeader(), // Add the JWT token here
+                    success: function (response) {
+                        $('#shiftList').empty();
+                        response.forEach(function (shift) {
+                            const shiftElement = $('<li class="list-group-item">ID: ' + shift.shift_id + ', Date: ' + shift.shift_date + ', Start: ' + shift.start_time + ', End: ' + shift.end_time + ', Trainees Needed: ' + shift.num_trainee_needed + ', Trained Needed: ' + shift.num_trained_needed + ', Trainers Needed: ' + shift.num_trainer_needed + ' <button class="btn btn-danger btn-sm float-end delete-shift" data-id="' + shift.shift_id + '">Delete</button></li>');
+                            $('#shiftList').append(shiftElement);
+                            loadAssignmentsUnderShift(shift.shift_id, shiftElement);
+                        });
+                    },
+                    error: function (xhr, status, error) {
+                        alert('Error: ' + xhr.responseJSON.message);
+                    }
+                });
+            }
+            // Load assignments under each shift
+            function loadAssignmentsUnderShift(shiftId, shiftElement) {
+                $.ajax({
+                    url: 'http://127.0.0.1:5000/shift_assignments',
+                    type: 'GET',
+                    success: function (response) {
+                        const assignments = response.filter(assignment => assignment.shift_id === shiftId);
+                        if (assignments.length > 0) {
+                            let assignmentsList = '<ul class="list-group mt-2">';
+                            assignments.forEach(function (assignment) {
+                                assignmentsList += `
+                            <li class="list-group-item">
+                            Assignment ID: ${assignment.assignment_id}, User ID: ${assignment.user_id}, Role: ${assignment.role.role_name}
+                                <select class="form-select update-status" data-id="${assignment.assignment_id}">
+                                    <option value="Available" ${assignment.status === "Available" ? "selected" : ""}>Available</option>
+                                    <option value="Assigned" ${assignment.status === "Assigned" ? "selected" : ""}>Assigned</option>
+                                    <option value="Confirmed" ${assignment.status === "Confirmed" ? "selected" : ""}>Confirmed</option>
+                                    <option value="No-show" ${assignment.status === "No-show" ? "selected" : ""}>No-show</option>
+                                    <option value="Completed" ${assignment.status === "Completed" ? "selected" : ""}>Completed</option>
+                                </select>
+                            </li>
+                            `;
+                            });
+                            assignmentsList += '</ul>';
+                            shiftElement.append(assignmentsList);
+                        }
+                    },
+                    error: function (xhr, status, error) {
+                        alert('Error: ' + xhr.responseJSON.message);
+                    }
+                });
+            }
+
+            // Other initialization or setup
+
+            socket.on('connect', function () {
+                console.log('Socket connected successfully');
+            });
+
+            socket.on('disconnect', function () {
+                console.log('Socket disconnected');
+            });
+
+            socket.on('connect_error', function (error) {
+                console.error('Socket connection error:', error);
+            });
+            // Listen for new shifts
+            socket.on('new_shift', function (data) {
+                console.log('New Shift:', data);
+                $('#shiftList').append('<li class="list-group-item">ID: ' + data.shift_id + ', Date: ' + data.shift_date + '</li>');
+            });
+
+            // Listen for new shifts
+            socket.on('new_user', function (data) {
+                console.log('New User:', data);
+                $('#userList').append('<li class="list-group-item">ID: ' + data.user_id + ', Username: ' + data.username + ', Email: ' + data.email + ', Role: ' + data.role.role_name + '</li>');
+            });
+
+            // Listen for new assignments
+            socket.on('new_assignment', function (data) {
+                console.log('New Assignment:', data);
+                $('#assignmentList').append('<li class="list-group-item">Assignment ID: ' + data.assignment_id + ', User ID: ' + data.user.user_id + ', Role: ' + data.role.role_name + '</li>');
+            });
+        });
+
+        $(document).on('change', '.update-status', function () {
+            const assignmentId = $(this).data('id');
+            const newStatus = $(this).val();
+
+            $.ajax({
+                url: `http://127.0.0.1:5000/shift_assignments/${assignmentId}`,
+                type: 'PATCH',
+                contentType: 'application/json',
+                headers: getAuthHeader(), // Add the JWT token here
+                data: JSON.stringify({ status: newStatus }),
+                success: function (response) {
+                    alert(`Status updated to ${newStatus} successfully!`);
+                },
+                error: function (xhr, status, error) {
+                    alert('Error updating status: ' + xhr.responseJSON.message);
+                }
+            });
         });
     </script>
 </body>
