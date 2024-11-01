@@ -11,7 +11,7 @@
 <body>
     <header class="bg-light p-3 mb-4">
         <div class="container d-flex justify-content-between align-items-center">
-            <h4>Bakery Shift Scheduler</h4>
+            <h4>Orange Bakery Collective</h4>
             <div id="userStatus">
                 <span id="loggedInUser" class="me-3"></span>
                 <button id="logoutButton" class="btn btn-danger btn-sm d-none">Logout</button>
@@ -453,6 +453,7 @@
                                     <option value="Confirmed" ${assignment.status === "Confirmed" ? "selected" : ""}>Confirmed</option>
                                     <option value="No-show" ${assignment.status === "No-show" ? "selected" : ""}>No-show</option>
                                     <option value="Completed" ${assignment.status === "Completed" ? "selected" : ""}>Completed</option>
+                                    <option value="Cancelled" ${assignment.status === "Cancelled" ? "selected" : ""}>Cancelled</option>
                                 </select>
                             </li>
                             `;
