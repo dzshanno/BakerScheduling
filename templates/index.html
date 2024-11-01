@@ -231,7 +231,7 @@
             };
 
             $.ajax({
-                url: 'http://127.0.0.1:5000/users',
+                url: '/users',
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify(userData),
@@ -249,7 +249,7 @@
 
         function loadRoles() {
             $.ajax({
-                url: 'http://127.0.0.1:5000/roles',
+                url: '/roles',
                 type: 'GET',
                 success: function (response) {
                     $('#role').empty();
@@ -276,7 +276,7 @@
             };
 
             $.ajax({
-                url: 'http://127.0.0.1:5000/shifts',
+                url: '/shifts',
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify(shiftData),
@@ -301,7 +301,7 @@
             };
 
             $.ajax({
-                url: 'http://127.0.0.1:5000/shift_assignments',
+                url: '/shift_assignments',
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify(assignmentData),
@@ -323,7 +323,7 @@
         $(document).on('click', '.delete-assignment', function () {
             const assignmentId = $(this).data('id');
             $.ajax({
-                url: 'http://127.0.0.1:5000/shift_assignments/' + assignmentId,
+                url: '/shift_assignments/' + assignmentId,
                 type: 'DELETE',
                 success: function (response) {
                     alert('Assignment deleted successfully!');
@@ -339,7 +339,7 @@
         $(document).on('click', '.delete-user', function () {
             const userId = $(this).data('id');
             $.ajax({
-                url: 'http://127.0.0.1:5000/users/' + userId,
+                url: '/users/' + userId,
                 type: 'DELETE',
                 success: function (response) {
                     alert('User deleted successfully!');
@@ -355,7 +355,7 @@
         $(document).on('click', '.delete-shift', function () {
             const shiftId = $(this).data('id');
             $.ajax({
-                url: 'http://127.0.0.1:5000/shifts/' + shiftId,
+                url: '/shifts/' + shiftId,
                 type: 'DELETE',
                 success: function (response) {
                     alert('Shift deleted successfully!');
@@ -371,7 +371,7 @@
         $(document).on('click', '.delete-assignment', function () {
             const assignmentId = $(this).data('id');
             $.ajax({
-                url: 'http://127.0.0.1:5000/shift_assignments/' + assignmentId,
+                url: '/shift_assignments/' + assignmentId,
                 type: 'DELETE',
                 success: function (response) {
                     alert('Assignment deleted successfully!');
@@ -400,7 +400,7 @@
             // Load list of users
             function loadUsers() {
                 $.ajax({
-                    url: 'http://127.0.0.1:5000/users',
+                    url: '/users',
                     type: 'GET',
                     headers: getAuthHeader(), // Add the JWT token here
                     success: function (response) {
@@ -418,7 +418,7 @@
             // Load list of shifts
             function loadShifts() {
                 $.ajax({
-                    url: 'http://127.0.0.1:5000/shifts',
+                    url: '/shifts',
                     type: 'GET',
                     headers: getAuthHeader(), // Add the JWT token here
                     success: function (response) {
@@ -437,7 +437,7 @@
             // Load assignments under each shift
             function loadAssignmentsUnderShift(shiftId, shiftElement) {
                 $.ajax({
-                    url: 'http://127.0.0.1:5000/shift_assignments',
+                    url: '/shift_assignments',
                     type: 'GET',
                     success: function (response) {
                         const assignments = response.filter(assignment => assignment.shift_id === shiftId);
@@ -505,7 +505,7 @@
             const newStatus = $(this).val();
 
             $.ajax({
-                url: `http://127.0.0.1:5000/shift_assignments/${assignmentId}`,
+                url: '/shift_assignments/${assignmentId}',
                 type: 'PATCH',
                 contentType: 'application/json',
                 headers: getAuthHeader(), // Add the JWT token here
