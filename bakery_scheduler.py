@@ -19,7 +19,9 @@ token_secret_key = os.getenv("TOKEN_SECRET_KEY", "supersecretkey")
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///bakery_scheduler.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = (
+    "postgresql://username:password@localhost:5432/bakery_scheduler_db"
+)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Initialize extensions
