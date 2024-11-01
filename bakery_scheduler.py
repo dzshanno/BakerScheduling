@@ -13,6 +13,7 @@ from datetime import datetime
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm import joinedload
 from dotenv import load_dotenv
+from flask_migrate import Migrate
 
 load_dotenv()
 
@@ -29,6 +30,8 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 ma = Marshmallow(app)
+
+migrate = Migrate(app, db)
 
 
 # Define Roles table
@@ -65,6 +68,7 @@ class ShiftAssignment(db.Model):
     shift_id = db.Column(db.Integer, db.ForeignKey("shift.shift_id"))
     user_id = db.Column(db.Integer, db.ForeignKey("user.user_id"))
     role_id = db.Column(db.Integer, db.ForeignKey("role.role_id"))
+    status = db.Column(db.String(50), nullable=False, default="Available")
     shift = db.relationship("Shift", backref=db.backref("assignments", lazy=True))
     user = db.relationship("User", backref=db.backref("assignments", lazy=True))
     role = db.relationship("Role")
@@ -106,6 +110,12 @@ class ShiftAssignmentSchema(ma.SQLAlchemyAutoSchema):
     shift_id = ma.auto_field()
     user_id = ma.auto_field()
     role_id = ma.auto_field()
+    status = ma.auto_field()
+
+    # Include role details
+    role = ma.Nested(RoleSchema, only=("role_id", "role_name"))
+    # Include user details
+    user = ma.Nested(UserSchema, only=("user_id", "username"))
 
 
 # Initialize Schemas
@@ -154,14 +164,7 @@ def get_users(current_user):
     # Fetch all users along with their roles
     all_users = User.query.options(joinedload(User.role)).all()
 
-    # Serialize users using the Marshmallow schema
-    users_data = users_schema.dump(all_users)
-
-    # Print the serialized dictionary data to inspect
-    print("[DEBUG] Serialized users data with role:", users_data)
-
-    # Return the serialized data
-    return jsonify(users_data)
+    return users_schema.jsonify(all_users)
 
 
 # Delete a user
@@ -356,16 +359,34 @@ def add_shift(current_user):
         return jsonify({"message": str(e)}), 400
 
 
+# Get all shift assignments
+@app.route("/shift_assignments", methods=["GET"])
+def get_shift_assignments():
+    all_assignments = ShiftAssignment.query.all()
+    return shift_assignments_schema.jsonify(all_assignments)
+
+
 # Assign user to a shift
 @app.route("/shift_assignments", methods=["POST"])
-def assign_shift():
+@token_required
+def assign_shift(current_user):
+    if current_user.role.role_name not in ["Admin", "Manager"]:
+        return (
+            jsonify(
+                {"message": "Unauthorized. Only admins or managers can assign shifts."}
+            ),
+            403,
+        )
+
     shift_id = request.json["shift_id"]
     user_id = request.json["user_id"]
     role_id = request.json["role_id"]
+    status = request.json.get("status", "Available")  # Default status to 'Available'
 
     new_assignment = ShiftAssignment(
-        shift_id=shift_id, user_id=user_id, role_id=role_id
+        shift_id=shift_id, user_id=user_id, role_id=role_id, status=status
     )
+
     try:
         db.session.add(new_assignment)
         db.session.commit()
@@ -374,11 +395,41 @@ def assign_shift():
         return jsonify({"message": str(e)}), 400
 
 
-# Get all shift assignments
-@app.route("/shift_assignments", methods=["GET"])
-def get_shift_assignments():
-    all_assignments = ShiftAssignment.query.all()
-    return shift_assignments_schema.jsonify(all_assignments)
+# update assignment status
+@app.route("/shift_assignments/<int:assignment_id>/status", methods=["PATCH"])
+@token_required
+def update_assignment_status(current_user, assignment_id):
+    if current_user.role.role_name not in ["Admin", "Manager"]:
+        return (
+            jsonify(
+                {
+                    "message": "Unauthorized. Only admins or managers can update shift status."
+                }
+            ),
+            403,
+        )
+
+    assignment = ShiftAssignment.query.get(assignment_id)
+    if not assignment:
+        return jsonify({"message": "Assignment not found"}), 404
+
+    new_status = request.json.get("status")
+    if new_status not in [
+        "Available",
+        "Assigned",
+        "Confirmed",
+        "Cancelled",
+        "No-show",
+        "Completed",
+    ]:
+        return jsonify({"message": "Invalid status value."}), 400
+
+    try:
+        assignment.status = new_status
+        db.session.commit()
+        return shift_assignment_schema.jsonify(assignment), 200
+    except Exception as e:
+        return jsonify({"message": str(e)}), 400
 
 
 if __name__ == "__main__":

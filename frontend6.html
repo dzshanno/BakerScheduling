@@ -364,7 +364,7 @@
                     if (assignments.length > 0) {
                         let assignmentsList = '<ul class="list-group mt-2">';
                         assignments.forEach(function (assignment) {
-                            assignmentsList += '<li class="list-group-item">Assignment ID: ' + assignment.assignment_id + ', User ID: ' + assignment.user_id + ', Role ID: ' + assignment.role_id + ' <button class="btn btn-danger btn-sm float-end delete-assignment" data-id="' + assignment.assignment_id + '">Delete</button></li>';
+                            assignmentsList += '<li class="list-group-item">Baker: ' + assignment.user.username + ', Role: ' + assignment.role.role_name + ' <button class="btn btn-danger btn-sm float-end delete-assignment" data-id="' + assignment.assignment_id + '">Delete</button></li>';
                         });
                         assignmentsList += '</ul>';
                         shiftElement.append(assignmentsList);
