@@ -37,33 +37,6 @@ class Role(db.Model):
     role_name = db.Column(db.String(50), unique=True, nullable=False)
 
 
-def create_base_roles():
-    base_roles = [
-        {"role_id": 1, "role_name": "Admin"},
-        {"role_id": 2, "role_name": "Trainer"},
-        {"role_id": 3, "role_name": "Trained Staff"},
-        {"role_id": 4, "role_name": "Trainee"},
-    ]
-
-    Session = scoped_session(sessionmaker(bind=db.engine))
-    session = Session()
-
-    with session.no_autoflush:
-        for role_data in base_roles:
-            existing_role = (
-                session.query(Role).filter_by(role_id=role_data["role_id"]).first()
-            )
-            if not existing_role:
-                new_role = Role(
-                    role_id=role_data["role_id"], role_name=role_data["role_name"]
-                )
-                session.add(new_role)
-                session.commit()
-
-    print("Base roles added successfully.")
-    session.close()
-
-
 # Define Users table
 class User(db.Model):
     user_id = db.Column(db.Integer, primary_key=True)
@@ -98,11 +71,22 @@ class ShiftAssignment(db.Model):
 
 
 # Marshmallow Schemas for serialization
+
+
+class RoleSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = Role
+        include_fk = True
+        load_instance = True
+
+
 class UserSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = User
         include_relationships = True
         load_instance = True
+
+    role = ma.Nested(RoleSchema, only=("role_id", "role_name"))
 
 
 class ShiftSchema(ma.SQLAlchemyAutoSchema):
@@ -166,8 +150,18 @@ def get_users(current_user):
             jsonify({"message": "Unauthorized. Only admins can view all users."}),
             403,
         )
-    all_users = User.query.all()
-    return users_schema.jsonify(all_users)
+
+    # Fetch all users along with their roles
+    all_users = User.query.options(joinedload(User.role)).all()
+
+    # Serialize users using the Marshmallow schema
+    users_data = users_schema.dump(all_users)
+
+    # Print the serialized dictionary data to inspect
+    print("[DEBUG] Serialized users data with role:", users_data)
+
+    # Return the serialized data
+    return jsonify(users_data)
 
 
 # Delete a user
@@ -185,6 +179,14 @@ def delete_user(current_user, user_id):
         return jsonify({"message": "User deleted successfully"}), 200
     except Exception as e:
         return jsonify({"message": str(e)}), 400
+
+
+@app.route("/roles", methods=["GET"])
+def get_roles():
+    roles = Role.query.all()
+    return jsonify(
+        [{"role_id": role.role_id, "role_name": role.role_name} for role in roles]
+    )
 
 
 # Delete a shift
@@ -237,24 +239,34 @@ def login():
     username = data["username"]
     password = data["password"]
 
-    user = authenticate_user(username, password)
-    if not user:
-        return make_response(
-            "Could not verify",
-            401,
-            {"WWW-Authenticate": 'Basic realm="Login required!"'},
-        )
+    try:
 
-    token = jwt.encode(
-        {
-            "user_id": user.user_id,
-            "username": user.username,  # Add this line to include the username in the token
-            "exp": datetime.utcnow() + timedelta(hours=1),
-        },
-        token_secret_key,
-        algorithm="HS256",
-    )
-    return jsonify({"token": token})
+        user = authenticate_user(username, password)
+        if not user:
+            print(f"[DEBUG] User '{username}' not found in database.")
+            return make_response(
+                "Could not verify",
+                401,
+                {"WWW-Authenticate": 'Basic realm="Login required!"'},
+            )
+
+        token = jwt.encode(
+            {
+                "user_id": user.user_id,
+                "username": user.username,  # Add this line to include the username in the token
+                "exp": datetime.utcnow() + timedelta(hours=1),
+            },
+            token_secret_key,
+            algorithm="HS256",
+        )
+        print(f"[DEBUG] User '{username}' successfully authenticated. Token generated.")
+        return jsonify({"token": token})
+
+    except Exception as e:
+        print(
+            f"[ERROR] An exception occurred during login for user '{username}': {str(e)}"
+        )
+        return make_response(jsonify({"error": "Internal server error"}), 500)
 
 
 # Create a new user with admin verification
@@ -376,3 +388,9 @@ if __name__ == "__main__":
             # TODO add base roles
             print("Database created successfully!")
     app.run(debug=True)
+
+
+@app.route("/shifts/<int:shift_id>/assignments", methods=["GET"])
+def get_shift_assignments_for_shift(shift_id):
+    assignments = ShiftAssignment.query.filter_by(shift_id=shift_id).all()
+    return shift_assignments_schema.jsonify(assignments)

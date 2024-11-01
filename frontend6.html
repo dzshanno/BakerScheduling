@@ -58,8 +58,8 @@
                         <input type="password" class="form-control" id="password" required>
                     </div>
                     <div class="mb-3">
-                        <label for="role" class="form-label">Role ID</label>
-                        <input type="number" class="form-control" id="role" required>
+                        <label for="role" class="form-label">Role</label>
+                        <select class="form-select" id="role" required></select>
                     </div>
                     <button type="submit" class="btn btn-primary">Create User</button>
                 </form>
@@ -100,6 +100,29 @@
             </div>
         </div>
 
+        <!-- Shift Assignment Form -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Assign User to Shift</h5>
+                <form id="assignmentForm">
+                    <div class="mb-3">
+                        <label for="shiftId" class="form-label">Shift ID</label>
+                        <input type="number" class="form-control" id="shiftId" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="userId" class="form-label">User ID</label>
+                        <input type="number" class="form-control" id="userId" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="assignmentRoleId" class="form-label">Role ID</label>
+                        <input type="number" class="form-control" id="assignmentRoleId" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Assign User to Shift</button>
+                </form>
+            </div>
+        </div>
+
+
         <!-- List of Users -->
         <div class="card mb-4">
             <div class="card-body">
@@ -121,18 +144,28 @@
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
-        // Update the header to show login status
+        // Update the header to show login status with role info
         function updateUserStatus() {
             const token = localStorage.getItem('jwtToken');
             if (token) {
                 const decoded = parseJwt(token);
                 $('#loggedInUser').text(`Logged in as: ${decoded.username}`);
                 $('#logoutButton').removeClass('d-none');
+
+                if (decoded.role_name === 'Admin') {
+                    $('#userForm').show();  // Show the user creation form only if admin
+                } else {
+                    $('#userForm').hide();
+                }
             } else {
                 $('#loggedInUser').text('Not logged in');
                 $('#logoutButton').addClass('d-none');
+                $('#userForm').hide();
             }
         }
+
+
+        // Update the header to show login status with role info
 
         // Parse JWT to get user information
         function parseJwt(token) {
@@ -213,6 +246,23 @@
             });
         });
 
+
+        function loadRoles() {
+            $.ajax({
+                url: 'http://127.0.0.1:5000/roles',
+                type: 'GET',
+                success: function (response) {
+                    $('#role').empty();
+                    response.forEach(function (role) {
+                        $('#role').append(`<option value="${role.role_id}">${role.role_name}</option>`);
+                    });
+                },
+                error: function (xhr, status, error) {
+                    alert('Error loading roles: ' + xhr.responseText);
+                }
+            });
+        }
+
         // Submit shift creation form
         $('#shiftForm').submit(function (event) {
             event.preventDefault();
@@ -241,6 +291,30 @@
             });
         });
 
+        // Submit shift assignment form
+        $('#assignmentForm').submit(function (event) {
+            event.preventDefault();
+            const assignmentData = {
+                shift_id: parseInt($('#shiftId').val()),
+                user_id: parseInt($('#userId').val()),
+                role_id: parseInt($('#assignmentRoleId').val())
+            };
+
+            $.ajax({
+                url: 'http://127.0.0.1:5000/shift_assignments',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(assignmentData),
+                success: function (response) {
+                    alert('User assigned to shift successfully!');
+                    $('#assignmentForm')[0].reset();
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
         // Load list of users
         $('#loadUsers').click(function () {
             $.ajax({
@@ -250,7 +324,9 @@
                 success: function (response) {
                     $('#userList').empty();
                     response.forEach(function (user) {
-                        $('#userList').append('<li class="list-group-item">ID: ' + user.user_id + ', Username: ' + user.username + ', Email: ' + user.email + ', Role ID: ' + user.role_id + '</li>');
+                        // Display role information correctly
+                        const roleName = user.role ? user.role.role_name : 'No role assigned';
+                        $('#userList').append('<li class="list-group-item">ID: ' + user.user_id + ', Username: ' + user.username + ', Email: ' + user.email + ', Role: ' + roleName + '</li>');
                     });
                 },
                 error: function (xhr, status, error) {
@@ -259,17 +335,104 @@
             });
         });
 
-        // Load list of shifts
+        // Load list of shifts with assignments
         $('#loadShifts').click(function () {
             $.ajax({
                 url: 'http://127.0.0.1:5000/shifts',
                 type: 'GET',
-                headers: getAuthHeader(), // Add the JWT token here
                 success: function (response) {
                     $('#shiftList').empty();
                     response.forEach(function (shift) {
-                        $('#shiftList').append('<li class="list-group-item">ID: ' + shift.shift_id + ', Date: ' + shift.shift_date + ', Start: ' + shift.start_time + ', End: ' + shift.end_time + ', Trainees Needed: ' + shift.num_trainee_needed + ', Trained Needed: ' + shift.num_trained_needed + ', Trainers Needed: ' + shift.num_trainer_needed + '</li>');
+                        const shiftElement = $('<li class="list-group-item">ID: ' + shift.shift_id + ', Date: ' + shift.shift_date + ', Start: ' + shift.start_time + ', End: ' + shift.end_time + ', Trainees Needed: ' + shift.num_trainee_needed + ', Trained Needed: ' + shift.num_trained_needed + ', Trainers Needed: ' + shift.num_trainer_needed + ' <button class="btn btn-danger btn-sm float-end delete-shift" data-id="' + shift.shift_id + '">Delete</button></li>');
+                        $('#shiftList').append(shiftElement);
+                        loadAssignmentsUnderShift(shift.shift_id, shiftElement);
                     });
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
+        // Load assignments under each shift
+        function loadAssignmentsUnderShift(shiftId, shiftElement) {
+            $.ajax({
+                url: 'http://127.0.0.1:5000/shift_assignments',
+                type: 'GET',
+                success: function (response) {
+                    const assignments = response.filter(assignment => assignment.shift_id === shiftId);
+                    if (assignments.length > 0) {
+                        let assignmentsList = '<ul class="list-group mt-2">';
+                        assignments.forEach(function (assignment) {
+                            assignmentsList += '<li class="list-group-item">Assignment ID: ' + assignment.assignment_id + ', User ID: ' + assignment.user_id + ', Role ID: ' + assignment.role_id + ' <button class="btn btn-danger btn-sm float-end delete-assignment" data-id="' + assignment.assignment_id + '">Delete</button></li>';
+                        });
+                        assignmentsList += '</ul>';
+                        shiftElement.append(assignmentsList);
+                    }
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        }
+
+        // Delete assignment
+        $(document).on('click', '.delete-assignment', function () {
+            const assignmentId = $(this).data('id');
+            $.ajax({
+                url: 'http://127.0.0.1:5000/shift_assignments/' + assignmentId,
+                type: 'DELETE',
+                success: function (response) {
+                    alert('Assignment deleted successfully!');
+                    $('#loadShifts').click(); // Reload shifts and assignments
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
+        // Delete user
+        $(document).on('click', '.delete-user', function () {
+            const userId = $(this).data('id');
+            $.ajax({
+                url: 'http://127.0.0.1:5000/users/' + userId,
+                type: 'DELETE',
+                success: function (response) {
+                    alert('User deleted successfully!');
+                    $('#loadUsers').click();
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
+        // Delete shift
+        $(document).on('click', '.delete-shift', function () {
+            const shiftId = $(this).data('id');
+            $.ajax({
+                url: 'http://127.0.0.1:5000/shifts/' + shiftId,
+                type: 'DELETE',
+                success: function (response) {
+                    alert('Shift deleted successfully!');
+                    $('#loadShifts').click();
+                },
+                error: function (xhr, status, error) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
+        // Delete shift assignment
+        $(document).on('click', '.delete-assignment', function () {
+            const assignmentId = $(this).data('id');
+            $.ajax({
+                url: 'http://127.0.0.1:5000/shift_assignments/' + assignmentId,
+                type: 'DELETE',
+                success: function (response) {
+                    alert('Assignment deleted successfully!');
+                    $('#loadAssignments').click();
                 },
                 error: function (xhr, status, error) {
                     alert('Error: ' + xhr.responseJSON.message);
