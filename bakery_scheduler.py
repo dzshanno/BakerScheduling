@@ -451,7 +451,7 @@ if __name__ == "__main__":
             db.create_all()
             # TODO add base roles
             print("Database created successfully!")
-    socketio.run(app, debug=True, host="0.0.0.0", port=5000)
+    socketio.run(app, debug=True, host="0.0.0.0", port=8080)
 
 
 @app.route("/shifts/<int:shift_id>/assignments", methods=["GET"])
