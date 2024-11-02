@@ -527,7 +527,4 @@ def update_shift_assignment_status(current_user, assignment_id):
         return jsonify({"message": str(e)}), 400
 
 
-application.logger.info("running the app now.")
-logger.info("running the app now2.")
-socketio.run(application, debug=True, host="0.0.0.0", port=8080)
-application.logger.info("after running the app.")
+socketio.run(application, debug=True, host="0.0.0.0", port=8000)
