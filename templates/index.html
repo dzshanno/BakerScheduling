@@ -187,7 +187,7 @@
             };
 
             $.ajax({
-                url: 'http://127.0.0.1:5000/login',
+                url: '/login',
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify(authData),
@@ -391,7 +391,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script>
         $(document).ready(function () {
-            const socket = io.connect('http://127.0.0.1:5000');
+            const socket = io.connect('/');
 
             // Automatically load users when the page loads
             loadUsers();

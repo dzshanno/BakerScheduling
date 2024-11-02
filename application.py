@@ -16,9 +16,18 @@ from dotenv import load_dotenv
 from flask_migrate import Migrate
 from flask_socketio import SocketIO
 from flask_socketio import emit
+import logging
+
 import eventlet
 
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 
 # Secret key for JWT
 token_secret_key = os.getenv("TOKEN_SECRET_KEY", "supersecretkey")
@@ -27,10 +36,20 @@ token_secret_key = os.getenv("TOKEN_SECRET_KEY", "supersecretkey")
 application = app = Flask(__name__)
 CORS(app)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+logger.debug(f"Database URL from environment: {os.getenv('DATABASE_URL')}")
+
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_ECHO"] = True
 
 # Initialize extensions
-db = SQLAlchemy(app)
+
+try:
+    db = SQLAlchemy(app)
+    logger.info("Database connection initialized successfully.")
+except Exception as e:
+    logger.error(f"Error initializing database connection: {e}")
+
+
 bcrypt = Bcrypt(app)
 ma = Marshmallow(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -164,15 +183,21 @@ def home():
 @app.route("/users", methods=["GET"])
 @token_required
 def get_users(current_user):
+    logger.debug(f"Fetching users. Current user role: {current_user.role.role_name}")
     if current_user.role.role_name != "Admin":
+        logger.warning(f"Unauthorized access attempt by user: {current_user.username}")
         return (
             jsonify({"message": "Unauthorized. Only admins can view all users."}),
             403,
         )
 
     # Fetch all users along with their roles
-    all_users = User.query.options(joinedload(User.role)).all()
-
+    try:
+        all_users = User.query.options(joinedload(User.role)).all()
+        logger.info(f"Successfully fetched {len(all_users)} users.")
+    except Exception as e:
+        logger.error(f"Error fetching users: {e}")
+        return jsonify({"message": "Error fetching users."}), 500
     return users_schema.jsonify(all_users)
 
 
@@ -446,11 +471,7 @@ def update_shift_assignment_status(current_user, assignment_id):
 
 
 if __name__ == "__main__":
-    if not os.path.exists("bakery_scheduler.db"):
-        with app.app_context():
-            db.create_all()
-            # TODO add base roles
-            print("Database created successfully!")
+
     socketio.run(app, debug=True, host="0.0.0.0", port=8080)
 
 
