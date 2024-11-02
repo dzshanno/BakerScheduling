@@ -12,6 +12,7 @@ import os
 from datetime import datetime
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm import joinedload
+from sqlalchemy.sql import text
 from dotenv import load_dotenv
 from flask_migrate import Migrate
 from flask_socketio import SocketIO
@@ -33,32 +34,58 @@ logger = logging.getLogger(__name__)
 token_secret_key = os.getenv("TOKEN_SECRET_KEY", "supersecretkey")
 
 # Initialize Flask app
-application = app = Flask(__name__)
-CORS(app)
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+application = Flask(__name__)
+CORS(application)
+
+db_config = {
+    "host": os.getenv("RDS_HOSTNAME"),  # The hostname of the DB instance
+    "port": os.getenv(
+        "RDS_PORT"
+    ),  # The port for the DB instance, default 5432 for PostgreSQL
+    "name": os.getenv("RDS_DB_NAME"),  # The database name, typically 'ebdb' for AWS RDS
+    "user": os.getenv("RDS_USERNAME"),  # The username configured for the DB
+    "password": os.getenv("RDS_PASSWORD"),  # The password for the DB
+}
+
+# Construct the DATABASE_URL for SQLAlchemy
+DATABASE_URL = f"postgresql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['name']}"
+
+# Set it in your app's configuration
+application.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
+
 logger.debug(f"Database URL from environment: {os.getenv('DATABASE_URL')}")
 
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SQLALCHEMY_ECHO"] = True
+application.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+application.config["SQLALCHEMY_ECHO"] = True
 
 # Initialize extensions
 
 try:
-    db = SQLAlchemy(app)
+    db = SQLAlchemy(application)
     logger.info("Database connection initialized successfully.")
 except Exception as e:
     logger.error(f"Error initializing database connection: {e}")
 
-try:
-    db.session.query("1").from_statement(db.text("SELECT 1")).all()
-    logging.info("Database query connection established successfully.")
-except Exception as e:
-    logging.error(f"Failed to query the database: {e}")
+
+application.logger.info("Setting up database checks before first request")
+with application.app_context():
+    try:
+        # Use a raw SQL query to check if the 'role' table exists and has data
+        query = text("SELECT COUNT(*) FROM role;")
+        result = db.session.execute(query)
+        count = result.scalar()
+
+        if count > 0:
+            application.logger.info("Database is connected and contains roles.")
+        else:
+            application.logger.warning("Database is connected but no roles found.")
+    except Exception as e:
+        application.logger.error(f"Failed to query the database: {str(e)}")
 
 
-bcrypt = Bcrypt(app)
-ma = Marshmallow(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+bcrypt = Bcrypt(application)
+ma = Marshmallow(application)
+socketio = SocketIO(application, cors_allowed_origins="*")
 
 
 @socketio.on("connect")
@@ -82,7 +109,7 @@ def default_error_handler(e):
     logging.error(f"Default error handler: {e}")
 
 
-migrate = Migrate(app, db)
+migrate = Migrate(application, db)
 
 
 # Define Roles table
@@ -202,13 +229,13 @@ def token_required(f):
 # API Endpoints
 
 
-@app.route("/")
+@application.route("/")
 def home():
     return render_template("index.html")
 
 
 # Protected route to get all users
-@app.route("/users", methods=["GET"])
+@application.route("/users", methods=["GET"])
 @token_required
 def get_users(current_user):
     logger.debug(f"Fetching users. Current user role: {current_user.role.role_name}")
@@ -230,7 +257,7 @@ def get_users(current_user):
 
 
 # Delete a user
-@app.route("/users/<int:user_id>", methods=["DELETE"])
+@application.route("/users/<int:user_id>", methods=["DELETE"])
 @token_required
 def delete_user(current_user, user_id):
     if current_user.role.role_name != "Admin":
@@ -246,7 +273,7 @@ def delete_user(current_user, user_id):
         return jsonify({"message": str(e)}), 400
 
 
-@app.route("/roles", methods=["GET"])
+@application.route("/roles", methods=["GET"])
 def get_roles():
     roles = Role.query.all()
     return jsonify(
@@ -255,7 +282,7 @@ def get_roles():
 
 
 # Delete a shift
-@app.route("/shifts/<int:shift_id>", methods=["DELETE"])
+@application.route("/shifts/<int:shift_id>", methods=["DELETE"])
 def delete_shift(shift_id):
     shift = Shift.query.get(shift_id)
     if shift is None:
@@ -269,7 +296,7 @@ def delete_shift(shift_id):
 
 
 # Delete a shift assignment
-@app.route("/shift_assignments/<int:assignment_id>", methods=["DELETE"])
+@application.route("/shift_assignments/<int:assignment_id>", methods=["DELETE"])
 def delete_shift_assignment(assignment_id):
     assignment = ShiftAssignment.query.get(assignment_id)
     if assignment is None:
@@ -290,7 +317,7 @@ def authenticate_user(username, password):
     return None
 
 
-@app.route("/login", methods=["POST"])
+@application.route("/login", methods=["POST"])
 def login():
     # Extract username and password from the JSON body instead of request.authorization
     data = request.get_json()
@@ -335,7 +362,7 @@ def login():
 
 
 # Create a new user with admin verification
-@app.route("/users", methods=["POST"])
+@application.route("/users", methods=["POST"])
 @token_required
 def add_user(current_user):
     if current_user.role.role_name != "Admin":
@@ -366,14 +393,14 @@ def add_user(current_user):
 
 
 # Get all shifts
-@app.route("/shifts", methods=["GET"])
+@application.route("/shifts", methods=["GET"])
 def get_shifts():
     all_shifts = Shift.query.all()
     return shifts_schema.jsonify(all_shifts)
 
 
 # Create a new shift
-@app.route("/shifts", methods=["POST"])
+@application.route("/shifts", methods=["POST"])
 @token_required
 def add_shift(current_user):
     if current_user.role.role_name not in ["Admin", "Manager"]:
@@ -427,14 +454,14 @@ def add_shift(current_user):
 
 
 # Get all shift assignments
-@app.route("/shift_assignments", methods=["GET"])
+@application.route("/shift_assignments", methods=["GET"])
 def get_shift_assignments():
     all_assignments = ShiftAssignment.query.all()
     return shift_assignments_schema.jsonify(all_assignments)
 
 
 # Assign user to a shift
-@app.route("/shift_assignments", methods=["POST"])
+@application.route("/shift_assignments", methods=["POST"])
 @token_required
 def assign_shift(current_user):
     if current_user.role.role_name not in ["Admin", "Manager"]:
@@ -469,7 +496,7 @@ def assign_shift(current_user):
         return jsonify({"message": str(e)}), 400
 
 
-@app.route("/shift_assignments/<int:assignment_id>", methods=["PATCH"])
+@application.route("/shift_assignments/<int:assignment_id>", methods=["PATCH"])
 @token_required
 def update_shift_assignment_status(current_user, assignment_id):
     if current_user.role.role_name not in ["Admin", "Manager"]:
@@ -500,10 +527,10 @@ def update_shift_assignment_status(current_user, assignment_id):
 
 if __name__ == "__main__":
 
-    socketio.run(app, debug=True, host="0.0.0.0", port=8080)
+    socketio.run(application, debug=True, host="0.0.0.0", port=8000)
 
 
-@app.route("/shifts/<int:shift_id>/assignments", methods=["GET"])
+@application.route("/shifts/<int:shift_id>/assignments", methods=["GET"])
 def get_shift_assignments_for_shift(shift_id):
     assignments = ShiftAssignment.query.filter_by(shift_id=shift_id).all()
     return shift_assignments_schema.jsonify(assignments)
