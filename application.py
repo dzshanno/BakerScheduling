@@ -49,10 +49,38 @@ try:
 except Exception as e:
     logger.error(f"Error initializing database connection: {e}")
 
+try:
+    db.session.query("1").from_statement(db.text("SELECT 1")).all()
+    logging.info("Database query connection established successfully.")
+except Exception as e:
+    logging.error(f"Failed to query the database: {e}")
+
 
 bcrypt = Bcrypt(app)
 ma = Marshmallow(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
+
+
+@socketio.on("connect")
+def on_connect():
+    logging.info("Client connected")
+    emit("response", {"message": "Connected to server"})
+
+
+@socketio.on("disconnect")
+def on_disconnect():
+    logging.info("Client disconnected")
+
+
+@socketio.on("error")
+def on_error(e):
+    logging.error(f"Socket error: {e}")
+
+
+@socketio.on_error_default
+def default_error_handler(e):
+    logging.error(f"Default error handler: {e}")
+
 
 migrate = Migrate(app, db)
 
